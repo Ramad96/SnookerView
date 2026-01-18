@@ -1,11 +1,15 @@
 # Snooker Points Calculator
 
+**Version: 1.0.1**
+
 A lightweight, single-page web application that uses your device camera to analyze a snooker table and calculate the maximum remaining points according to official snooker rules.
 
 ## Features
 
 - **Camera Integration**: Uses Web Camera API (getUserMedia) for mobile and desktop
+- **Camera Zoom**: Adjustable zoom controls for better framing (when supported by device)
 - **Ball Detection**: Color-based heuristic detection system
+- **Visual Annotations**: Highlights detected balls on the captured image with point values
 - **Accurate Scoring**: Implements official snooker rules correctly
 - **Clear Display**: Shows breakdown of remaining balls and point calculations
 - **Lightweight**: Single HTML file, no build tools required
@@ -15,9 +19,11 @@ A lightweight, single-page web application that uses your device camera to analy
 
 1. Open `index.html` in a modern web browser
 2. Click "Open Camera" and grant camera permissions
-3. Point camera at the snooker table
-4. Click "Capture Photo" when ready
-5. View the calculated maximum remaining points and breakdown
+3. Use the zoom slider (if available) to adjust the camera view
+4. Point camera at the snooker table
+5. Click "Capture Photo" when ready
+6. View the captured image with highlighted detected balls showing their point values
+7. Review the calculated maximum remaining points and breakdown table
 
 ## Ball Detection Approach
 
@@ -143,6 +149,22 @@ The detection logic is cleanly separated, making it easy to swap in improved alg
 4. **Ball Count**: For reds, estimates count based on pixel density (may not be exact)
 5. **Color Accuracy**: Assumes standard snooker ball colors (may vary with different ball sets)
 
+## Version History
+
+### v1.0.1
+- Added version number display on webpage
+- Implemented camera zoom controls (when supported by device)
+- Added visual ball annotations on captured image
+- Annotations show ball type and point values
+- Improved ball position detection with clustering
+
+### v1.0.0
+- Initial release
+- Camera capture functionality
+- Color-based ball detection
+- Snooker scoring rules implementation
+- Results breakdown display
+
 ## Future Enhancements
 
 - [ ] TensorFlow.js model integration for better detection
@@ -150,7 +172,7 @@ The detection logic is cleanly separated, making it easy to swap in improved alg
 - [ ] Save/load captured images
 - [ ] History of calculations
 - [ ] Different game modes (8-ball, 9-ball)
-- [ ] Improved mobile camera controls
+- [ ] Improved ball annotation accuracy
 - [ ] Offline functionality with service worker
 
 ## License

@@ -40,6 +40,17 @@
             font-size: 0.9rem;
         }
 
+        .version {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 0.75rem;
+            opacity: 0.7;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 5px 10px;
+            border-radius: 12px;
+        }
+
         .camera-section {
             background: rgba(255, 255, 255, 0.1);
             border-radius: 12px;
@@ -63,6 +74,84 @@
             overflow: hidden;
             aspect-ratio: 16/9;
             margin-bottom: 15px;
+        }
+
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        .zoom-controls label {
+            font-size: 0.9rem;
+            min-width: 80px;
+        }
+
+        .zoom-slider {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .zoom-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #4a7c59;
+            cursor: pointer;
+        }
+
+        .zoom-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #4a7c59;
+            cursor: pointer;
+            border: none;
+        }
+
+        .zoom-value {
+            min-width: 50px;
+            text-align: right;
+            font-size: 0.9rem;
+        }
+
+        .annotated-image {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .ball-annotation {
+            position: absolute;
+            border: 3px solid;
+            border-radius: 50%;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+        }
+
+        .ball-label {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            white-space: nowrap;
+            pointer-events: none;
+            transform: translate(-50%, -100%);
+            margin-top: -5px;
         }
 
         video, canvas, img {
@@ -246,6 +335,7 @@
 </head>
 <body>
     <div class="container">
+        <div class="version" id="version">v1.0.1</div>
         <header>
             <h1>🎱 Snooker Points Calculator</h1>
             <p class="subtitle">Capture a photo of the table to calculate maximum remaining points</p>
@@ -257,7 +347,15 @@
             <div class="video-container">
                 <video id="video" autoplay playsinline></video>
                 <canvas id="canvas" style="display: none;"></canvas>
-                <img id="capturedImage" class="captured-image" alt="Captured snooker table">
+                <div id="annotatedImageContainer" class="annotated-image captured-image" style="display: none;">
+                    <img id="capturedImage" alt="Captured snooker table" style="width: 100%; height: 100%; object-fit: contain;">
+                </div>
+            </div>
+
+            <div class="zoom-controls" id="zoomControls" style="display: none;">
+                <label for="zoomSlider">Zoom:</label>
+                <input type="range" id="zoomSlider" class="zoom-slider" min="1" max="5" step="0.1" value="1">
+                <span class="zoom-value" id="zoomValue">1.0x</span>
             </div>
 
             <div class="camera-controls">
@@ -295,21 +393,32 @@
 
     <script>
         // ============================================================================
+        // VERSION
+        // ============================================================================
+        const VERSION = '1.0.1';
+
+        // ============================================================================
         // CAMERA & IMAGE CAPTURE
         // ============================================================================
 
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const capturedImage = document.getElementById('capturedImage');
+        const annotatedImageContainer = document.getElementById('annotatedImageContainer');
         const startCameraBtn = document.getElementById('startCamera');
         const captureBtn = document.getElementById('captureBtn');
         const retakeBtn = document.getElementById('retakeBtn');
         const loading = document.getElementById('loading');
         const errorMessage = document.getElementById('errorMessage');
         const resultsSection = document.getElementById('resultsSection');
+        const zoomControls = document.getElementById('zoomControls');
+        const zoomSlider = document.getElementById('zoomSlider');
+        const zoomValue = document.getElementById('zoomValue');
 
         let stream = null;
         let capturedImageData = null;
+        let currentZoom = 1;
+        let track = null;
 
         function showError(message) {
             errorMessage.textContent = message;
@@ -325,21 +434,62 @@
                     video: {
                         facingMode: 'environment', // Prefer back camera on mobile
                         width: { ideal: 1280 },
-                        height: { ideal: 720 }
+                        height: { ideal: 720 },
+                        zoom: { ideal: 1, max: 5 }
                     }
                 });
                 video.srcObject = stream;
                 video.style.display = 'block';
-                capturedImage.classList.remove('active');
+                annotatedImageContainer.style.display = 'none';
                 startCameraBtn.disabled = true;
                 captureBtn.disabled = false;
                 retakeBtn.style.display = 'none';
                 resultsSection.classList.remove('active');
+                
+                // Get video track for zoom control
+                track = stream.getVideoTracks()[0];
+                const capabilities = track.getCapabilities();
+                
+                // Show zoom controls if supported
+                if (capabilities.zoom) {
+                    zoomControls.style.display = 'flex';
+                    zoomSlider.min = capabilities.zoom.min || 1;
+                    zoomSlider.max = capabilities.zoom.max || 5;
+                    zoomSlider.step = capabilities.zoom.step || 0.1;
+                    currentZoom = capabilities.zoom.min || 1;
+                    zoomSlider.value = currentZoom;
+                    updateZoomDisplay();
+                } else {
+                    zoomControls.style.display = 'none';
+                }
             } catch (error) {
                 showError('Unable to access camera. Please ensure permissions are granted.');
                 console.error('Camera error:', error);
             }
         }
+
+        function updateZoomDisplay() {
+            zoomValue.textContent = parseFloat(currentZoom).toFixed(1) + 'x';
+        }
+
+        function applyZoom(value) {
+            if (track && track.getCapabilities().zoom) {
+                try {
+                    const settings = track.getSettings();
+                    track.applyConstraints({
+                        advanced: [{ zoom: parseFloat(value) }]
+                    });
+                    currentZoom = parseFloat(value);
+                    updateZoomDisplay();
+                } catch (error) {
+                    console.error('Zoom error:', error);
+                }
+            }
+        }
+
+        zoomSlider.addEventListener('input', (e) => {
+            applyZoom(e.target.value);
+        });
 
         function capturePhoto() {
             canvas.width = video.videoWidth;
@@ -349,8 +499,9 @@
             
             capturedImageData = canvas.toDataURL('image/jpeg');
             capturedImage.src = capturedImageData;
-            capturedImage.classList.add('active');
             video.style.display = 'none';
+            annotatedImageContainer.style.display = 'block';
+            zoomControls.style.display = 'none';
             
             captureBtn.disabled = true;
             retakeBtn.style.display = 'inline-block';
@@ -359,6 +510,7 @@
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
                 stream = null;
+                track = null;
             }
             
             // Analyze the image
@@ -366,7 +518,10 @@
         }
 
         function retakePhoto() {
-            capturedImage.classList.remove('active');
+            annotatedImageContainer.style.display = 'none';
+            // Clear annotations
+            const annotations = annotatedImageContainer.querySelectorAll('.ball-annotation');
+            annotations.forEach(ann => ann.remove());
             capturedImageData = null;
             retakeBtn.style.display = 'none';
             resultsSection.classList.remove('active');
@@ -470,6 +625,17 @@
                 black: 0
             };
             
+            // Store positions of detected pixels for each color
+            const colorPositions = {
+                red: [],
+                yellow: [],
+                green: [],
+                brown: [],
+                blue: [],
+                pink: [],
+                black: []
+            };
+            
             // Sample pixels from the image
             for (let y = 0; y < height; y += sampleRate) {
                 for (let x = 0; x < width; x += sampleRate) {
@@ -483,6 +649,7 @@
                     for (const [colorKey, colorDef] of Object.entries(BALL_COLORS)) {
                         if (matchesColor(pixel, colorDef)) {
                             colorCounts[colorKey]++;
+                            colorPositions[colorKey].push({ x, y });
                             break; // Only count once per pixel
                         }
                     }
@@ -493,6 +660,16 @@
             // This is a heuristic - can be tuned based on testing
             const threshold = 50; // Minimum pixel count to consider a ball present
             
+            // Cluster positions to find ball centers
+            const ballPositions = {};
+            for (const [colorKey, positions] of Object.entries(colorPositions)) {
+                if (positions.length > threshold) {
+                    ballPositions[colorKey] = clusterPositions(positions, width, height);
+                } else {
+                    ballPositions[colorKey] = [];
+                }
+            }
+            
             const detectedBalls = {
                 reds: Math.min(15, Math.floor(colorCounts.red / 200)), // Red balls are more numerous
                 yellow: colorCounts.yellow > threshold ? 1 : 0,
@@ -500,10 +677,49 @@
                 brown: colorCounts.brown > threshold ? 1 : 0,
                 blue: colorCounts.blue > threshold ? 1 : 0,
                 pink: colorCounts.pink > threshold ? 1 : 0,
-                black: colorCounts.black > threshold ? 1 : 0
+                black: colorCounts.black > threshold ? 1 : 0,
+                positions: ballPositions
             };
             
             return detectedBalls;
+        }
+
+        /**
+         * Cluster nearby positions to find ball centers
+         * Simple clustering: group positions within a certain distance
+         */
+        function clusterPositions(positions, imageWidth, imageHeight) {
+            if (positions.length === 0) return [];
+            
+            const clusterRadius = Math.min(imageWidth, imageHeight) * 0.05; // 5% of image dimension
+            const clusters = [];
+            
+            for (const pos of positions) {
+                let assigned = false;
+                for (const cluster of clusters) {
+                    const dx = pos.x - cluster.center.x;
+                    const dy = pos.y - cluster.center.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < clusterRadius) {
+                        // Add to existing cluster
+                        cluster.points.push(pos);
+                        cluster.center.x = (cluster.center.x * (cluster.points.length - 1) + pos.x) / cluster.points.length;
+                        cluster.center.y = (cluster.center.y * (cluster.points.length - 1) + pos.y) / cluster.points.length;
+                        assigned = true;
+                        break;
+                    }
+                }
+                if (!assigned) {
+                    // Create new cluster
+                    clusters.push({
+                        center: { x: pos.x, y: pos.y },
+                        points: [pos]
+                    });
+                }
+            }
+            
+            // Return cluster centers
+            return clusters.map(c => c.center);
         }
 
         async function analyzeImage(imageDataUrl) {
@@ -536,6 +752,9 @@
                 // Calculate points
                 const result = calculateMaximumPoints(detectedBalls);
                 
+                // Draw annotations on the image
+                drawBallAnnotations(img, detectedBalls, result);
+                
                 // Display results
                 displayResults(detectedBalls, result);
                 
@@ -545,6 +764,94 @@
             } finally {
                 loading.classList.remove('active');
             }
+        }
+
+        /**
+         * Draw annotations on the captured image showing detected balls
+         */
+        function drawBallAnnotations(img, detectedBalls, calculation) {
+            // Clear previous annotations
+            const existingAnnotations = annotatedImageContainer.querySelectorAll('.ball-annotation');
+            existingAnnotations.forEach(ann => ann.remove());
+            
+            // Wait for image to be fully loaded and displayed
+            if (!capturedImage.complete) {
+                capturedImage.onload = () => {
+                    drawBallAnnotations(img, detectedBalls, calculation);
+                };
+                return;
+            }
+            
+            // Use setTimeout to ensure image is rendered
+            setTimeout(() => {
+                const imgRect = capturedImage.getBoundingClientRect();
+                const containerRect = annotatedImageContainer.getBoundingClientRect();
+                
+                // Calculate scale factors
+                const scaleX = imgRect.width / img.width;
+                const scaleY = imgRect.height / img.height;
+                
+                // Color mapping for annotations
+                const annotationColors = {
+                    red: '#ff0000',
+                    yellow: '#ffff00',
+                    green: '#00ff00',
+                    brown: '#8b4513',
+                    blue: '#0000ff',
+                    pink: '#ff69b4',
+                    black: '#000000'
+                };
+                
+                // Draw annotations for each detected ball
+                for (const [colorKey, positions] of Object.entries(detectedBalls.positions || {})) {
+                    if (positions.length === 0) continue;
+                    
+                    const color = annotationColors[colorKey] || '#ffffff';
+                    const ballInfo = BALL_COLORS[colorKey];
+                    
+                    // Calculate points contribution for this ball type
+                    let pointsContribution = 0;
+                    if (colorKey === 'red') {
+                        pointsContribution = detectedBalls.reds;
+                    } else {
+                        pointsContribution = calculation.breakdown
+                            .filter(b => b.name.includes(ballInfo.name))
+                            .reduce((sum, b) => sum + b.points, 0);
+                    }
+                    
+                    positions.forEach((pos, index) => {
+                        const annotation = document.createElement('div');
+                        annotation.className = 'ball-annotation';
+                        
+                        // Calculate position relative to displayed image
+                        const x = pos.x * scaleX;
+                        const y = pos.y * scaleY;
+                        const radius = Math.min(imgRect.width, imgRect.height) * 0.03; // 3% of image size
+                        
+                        annotation.style.left = x + 'px';
+                        annotation.style.top = y + 'px';
+                        annotation.style.width = (radius * 2) + 'px';
+                        annotation.style.height = (radius * 2) + 'px';
+                        annotation.style.borderColor = color;
+                        annotation.style.marginLeft = -radius + 'px';
+                        annotation.style.marginTop = -radius + 'px';
+                        
+                        // Add label with ball name and points
+                        const label = document.createElement('div');
+                        label.className = 'ball-label';
+                        if (colorKey === 'red') {
+                            label.textContent = `Red (${pointsContribution}pt)`;
+                        } else {
+                            label.textContent = `${ballInfo.name} (${ballInfo.points}pt)`;
+                        }
+                        label.style.left = '50%';
+                        label.style.top = '0';
+                        
+                        annotation.appendChild(label);
+                        annotatedImageContainer.appendChild(annotation);
+                    });
+                }
+            }, 100);
         }
 
         // ============================================================================
@@ -729,6 +1036,9 @@
             
             resultsSection.classList.add('active');
         }
+
+        // Update version display on load
+        document.getElementById('version').textContent = 'v' + VERSION;
     </script>
 </body>
 </html>
