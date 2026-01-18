@@ -1,12 +1,13 @@
 # Snooker Points Calculator
 
-**Version: 1.0.1**
+**Version: 1.0.2**
 
 A lightweight, single-page web application that uses your device camera to analyze a snooker table and calculate the maximum remaining points according to official snooker rules.
 
 ## Features
 
 - **Camera Integration**: Uses Web Camera API (getUserMedia) for mobile and desktop
+- **Image Upload**: Alternative option to upload images from your device
 - **Camera Zoom**: Adjustable zoom controls for better framing (when supported by device)
 - **Ball Detection**: Color-based heuristic detection system
 - **Visual Annotations**: Highlights detected balls on the captured image with point values
@@ -17,13 +18,24 @@ A lightweight, single-page web application that uses your device camera to analy
 
 ## How to Use
 
+### Option 1: Using Camera
 1. Open `index.html` in a modern web browser
-2. Click "Open Camera" and grant camera permissions
+2. Click "Open Camera" and grant camera permissions when prompted
 3. Use the zoom slider (if available) to adjust the camera view
 4. Point camera at the snooker table
 5. Click "Capture Photo" when ready
 6. View the captured image with highlighted detected balls showing their point values
 7. Review the calculated maximum remaining points and breakdown table
+
+### Option 2: Uploading an Image
+1. Open `index.html` in a modern web browser
+2. Click "Upload Image" button
+3. Select an image file from your device
+4. The image will be analyzed automatically
+5. View the image with highlighted detected balls showing their point values
+6. Review the calculated maximum remaining points and breakdown table
+
+**Note**: For camera access to work, the page must be served over HTTPS (or localhost). If camera permissions are not available, use the upload option instead.
 
 ## Ball Detection Approach
 
@@ -124,6 +136,7 @@ The calculator correctly implements official snooker scoring rules:
 - Modern browsers with camera API support
 - Chrome, Firefox, Safari, Edge (latest versions)
 - Mobile browsers (iOS Safari, Chrome Mobile)
+- **Important**: Camera API requires HTTPS (or localhost). For file:// protocol, use the upload option instead.
 
 ### Performance
 - Lightweight: Single file, ~15KB
@@ -150,6 +163,13 @@ The detection logic is cleanly separated, making it easy to swap in improved alg
 5. **Color Accuracy**: Assumes standard snooker ball colors (may vary with different ball sets)
 
 ## Version History
+
+### v1.0.2
+- Added image upload functionality as alternative to camera
+- Improved camera permission error handling with specific error messages
+- Enhanced camera API availability detection
+- Better error messages guiding users to upload option when camera fails
+- Fixed retake functionality to work with both camera and upload
 
 ### v1.0.1
 - Added version number display on webpage
