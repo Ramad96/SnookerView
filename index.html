@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snooker Points Calculator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1a472a 0%, #2d5a3d 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }
+
+        .camera-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .camera-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            margin-bottom: 15px;
+        }
+
+        video, canvas, img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .captured-image {
+            display: none;
+        }
+
+        .captured-image.active {
+            display: block;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #4a7c59;
+            color: white;
+        }
+
+        button:hover:not(:disabled) {
+            background: #5a8c69;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button.primary {
+            background: #d32f2f;
+        }
+
+        button.primary:hover:not(:disabled) {
+            background: #e53935;
+        }
+
+        button.secondary {
+            background: #666;
+        }
+
+        button.secondary:hover:not(:disabled) {
+            background: #777;
+        }
+
+        .results-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            backdrop-filter: blur(10px);
+            display: none;
+        }
+
+        .results-section.active {
+            display: block;
+        }
+
+        .total-points {
+            text-align: center;
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .breakdown-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .breakdown-table th,
+        .breakdown-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .breakdown-table th {
+            background: rgba(0, 0, 0, 0.3);
+            font-weight: 600;
+        }
+
+        .breakdown-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .ball-status {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        .ball-status.present {
+            background: #4caf50;
+        }
+
+        .ball-status.absent {
+            background: #f44336;
+        }
+
+        .calculation-explanation {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            line-height: 1.6;
+        }
+
+        .error-message {
+            background: rgba(211, 47, 47, 0.2);
+            border: 1px solid #d32f2f;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .error-message.active {
+            display: block;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .total-points {
+                font-size: 2rem;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎱 Snooker Points Calculator</h1>
+            <p class="subtitle">Capture a photo of the table to calculate maximum remaining points</p>
+        </header>
+
+        <div class="camera-section">
+            <div class="error-message" id="errorMessage"></div>
+            
+            <div class="video-container">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas" style="display: none;"></canvas>
+                <img id="capturedImage" class="captured-image" alt="Captured snooker table">
+            </div>
+
+            <div class="camera-controls">
+                <div class="button-group">
+                    <button id="startCamera" class="primary">Open Camera</button>
+                    <button id="captureBtn" disabled>Capture Photo</button>
+                    <button id="retakeBtn" class="secondary" style="display: none;">Retake</button>
+                </div>
+            </div>
+
+            <div class="loading" id="loading">
+                Analyzing image...
+            </div>
+        </div>
+
+        <div class="results-section" id="resultsSection">
+            <div class="total-points" id="totalPoints">0</div>
+            
+            <table class="breakdown-table">
+                <thead>
+                    <tr>
+                        <th>Ball</th>
+                        <th>Status</th>
+                        <th>Points</th>
+                        <th>Contribution</th>
+                    </tr>
+                </thead>
+                <tbody id="breakdownBody">
+                </tbody>
+            </table>
+
+            <div class="calculation-explanation" id="explanation"></div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // CAMERA & IMAGE CAPTURE
+        // ============================================================================
+
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const capturedImage = document.getElementById('capturedImage');
+        const startCameraBtn = document.getElementById('startCamera');
+        const captureBtn = document.getElementById('captureBtn');
+        const retakeBtn = document.getElementById('retakeBtn');
+        const loading = document.getElementById('loading');
+        const errorMessage = document.getElementById('errorMessage');
+        const resultsSection = document.getElementById('resultsSection');
+
+        let stream = null;
+        let capturedImageData = null;
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.add('active');
+            setTimeout(() => {
+                errorMessage.classList.remove('active');
+            }, 5000);
+        }
+
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment', // Prefer back camera on mobile
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                video.srcObject = stream;
+                video.style.display = 'block';
+                capturedImage.classList.remove('active');
+                startCameraBtn.disabled = true;
+                captureBtn.disabled = false;
+                retakeBtn.style.display = 'none';
+                resultsSection.classList.remove('active');
+            } catch (error) {
+                showError('Unable to access camera. Please ensure permissions are granted.');
+                console.error('Camera error:', error);
+            }
+        }
+
+        function capturePhoto() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            capturedImageData = canvas.toDataURL('image/jpeg');
+            capturedImage.src = capturedImageData;
+            capturedImage.classList.add('active');
+            video.style.display = 'none';
+            
+            captureBtn.disabled = true;
+            retakeBtn.style.display = 'inline-block';
+            
+            // Stop camera stream
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            
+            // Analyze the image
+            analyzeImage(capturedImageData);
+        }
+
+        function retakePhoto() {
+            capturedImage.classList.remove('active');
+            capturedImageData = null;
+            retakeBtn.style.display = 'none';
+            resultsSection.classList.remove('active');
+            startCamera();
+        }
+
+        startCameraBtn.addEventListener('click', startCamera);
+        captureBtn.addEventListener('click', capturePhoto);
+        retakeBtn.addEventListener('click', retakePhoto);
+
+        // ============================================================================
+        // BALL DETECTION
+        // ============================================================================
+
+        /**
+         * Ball detection using color-based heuristics
+         * This is a simplified approach that can be improved with ML models later
+         * 
+         * Detection Strategy:
+         * 1. Sample pixels from the image
+         * 2. Use HSV color space for better color matching
+         * 3. Check for ball-like circular regions with expected colors
+         * 4. Count detected balls by color
+         * 
+         * Future improvements:
+         * - Use TensorFlow.js with a trained model
+         * - Implement blob detection for circular shapes
+         * - Add perspective correction for table angle
+         * - Use edge detection to identify ball boundaries
+         */
+
+        const BALL_COLORS = {
+            red: { name: 'Red', points: 1, hsv: { h: [0, 20], s: [50, 100], v: [30, 100] } },
+            yellow: { name: 'Yellow', points: 2, hsv: { h: [40, 70], s: [50, 100], v: [50, 100] } },
+            green: { name: 'Green', points: 3, hsv: { h: [70, 150], s: [40, 100], v: [30, 100] } },
+            brown: { name: 'Brown', points: 4, hsv: { h: [10, 40], s: [30, 80], v: [20, 60] } },
+            blue: { name: 'Blue', points: 5, hsv: { h: [180, 250], s: [40, 100], v: [30, 100] } },
+            pink: { name: 'Pink', points: 6, hsv: { h: [300, 360], s: [20, 80], v: [50, 100] } },
+            black: { name: 'Black', points: 7, hsv: { h: [0, 360], s: [0, 30], v: [0, 30] } }
+        };
+
+        function rgbToHsv(r, g, b) {
+            r /= 255;
+            g /= 255;
+            b /= 255;
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            const diff = max - min;
+            
+            let h = 0;
+            if (diff !== 0) {
+                if (max === r) {
+                    h = ((g - b) / diff) % 6;
+                } else if (max === g) {
+                    h = (b - r) / diff + 2;
+                } else {
+                    h = (r - g) / diff + 4;
+                }
+            }
+            h = Math.round(h * 60);
+            if (h < 0) h += 360;
+            
+            const s = max === 0 ? 0 : Math.round((diff / max) * 100);
+            const v = Math.round(max * 100);
+            
+            return { h, s, v };
+        }
+
+        function matchesColor(pixel, colorDef) {
+            const hsv = rgbToHsv(pixel.r, pixel.g, pixel.b);
+            const { h: hRange, s: sRange, v: vRange } = colorDef.hsv;
+            
+            // Handle hue wrap-around (e.g., red spans 0-20 and 340-360)
+            let hMatch = false;
+            if (hRange[0] > hRange[1]) {
+                // Wrap-around case
+                hMatch = hsv.h >= hRange[0] || hsv.h <= hRange[1];
+            } else {
+                hMatch = hsv.h >= hRange[0] && hsv.h <= hRange[1];
+            }
+            
+            return hMatch &&
+                   hsv.s >= sRange[0] && hsv.s <= sRange[1] &&
+                   hsv.v >= vRange[0] && hsv.v <= vRange[1];
+        }
+
+        function detectBalls(imageData) {
+            const width = imageData.width;
+            const height = imageData.data.length / (4 * width);
+            const data = imageData.data;
+            
+            // Sample pixels (every Nth pixel for performance)
+            const sampleRate = 5;
+            const colorCounts = {
+                red: 0,
+                yellow: 0,
+                green: 0,
+                brown: 0,
+                blue: 0,
+                pink: 0,
+                black: 0
+            };
+            
+            // Sample pixels from the image
+            for (let y = 0; y < height; y += sampleRate) {
+                for (let x = 0; x < width; x += sampleRate) {
+                    const idx = (y * width + x) * 4;
+                    const r = data[idx];
+                    const g = data[idx + 1];
+                    const b = data[idx + 2];
+                    const pixel = { r, g, b };
+                    
+                    // Check each ball color
+                    for (const [colorKey, colorDef] of Object.entries(BALL_COLORS)) {
+                        if (matchesColor(pixel, colorDef)) {
+                            colorCounts[colorKey]++;
+                            break; // Only count once per pixel
+                        }
+                    }
+                }
+            }
+            
+            // Threshold: if we found enough pixels of a color, consider the ball present
+            // This is a heuristic - can be tuned based on testing
+            const threshold = 50; // Minimum pixel count to consider a ball present
+            
+            const detectedBalls = {
+                reds: Math.min(15, Math.floor(colorCounts.red / 200)), // Red balls are more numerous
+                yellow: colorCounts.yellow > threshold ? 1 : 0,
+                green: colorCounts.green > threshold ? 1 : 0,
+                brown: colorCounts.brown > threshold ? 1 : 0,
+                blue: colorCounts.blue > threshold ? 1 : 0,
+                pink: colorCounts.pink > threshold ? 1 : 0,
+                black: colorCounts.black > threshold ? 1 : 0
+            };
+            
+            return detectedBalls;
+        }
+
+        async function analyzeImage(imageDataUrl) {
+            loading.classList.add('active');
+            resultsSection.classList.remove('active');
+            
+            try {
+                // Create image element to load the captured image
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                    img.src = imageDataUrl;
+                });
+                
+                // Draw image to canvas for analysis
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                // Get image data
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                // Detect balls
+                const detectedBalls = detectBalls(imageData);
+                
+                // Calculate points
+                const result = calculateMaximumPoints(detectedBalls);
+                
+                // Display results
+                displayResults(detectedBalls, result);
+                
+            } catch (error) {
+                showError('Error analyzing image. Please try again.');
+                console.error('Analysis error:', error);
+            } finally {
+                loading.classList.remove('active');
+            }
+        }
+
+        // ============================================================================
+        // SNOOKER SCORING RULES
+        // ============================================================================
+
+        /**
+         * Calculates maximum remaining points according to official snooker rules
+         * 
+         * Rules:
+         * 1. While reds remain:
+         *    - Each red = 1 point
+         *    - After each red, can pot any colour (worth its value)
+         *    - Colours are respotted until all reds are gone
+         *    - Maximum: reds * (1 + highest colour value)
+         * 
+         * 2. After all reds are potted:
+         *    - Colours must be potted in order: Yellow(2) → Green(3) → Brown(4) → Blue(5) → Pink(6) → Black(7)
+         *    - Each colour is only potted once
+         * 
+         * @param {Object} balls - Object with ball counts
+         * @returns {Object} - Calculation result with total points and breakdown
+         */
+        function calculateMaximumPoints(balls) {
+            const result = {
+                total: 0,
+                breakdown: [],
+                explanation: []
+            };
+            
+            const redsRemaining = balls.reds;
+            const colours = [
+                { key: 'yellow', name: 'Yellow', points: 2 },
+                { key: 'green', name: 'Green', points: 3 },
+                { key: 'brown', name: 'Brown', points: 4 },
+                { key: 'blue', name: 'Blue', points: 5 },
+                { key: 'pink', name: 'Pink', points: 6 },
+                { key: 'black', name: 'Black', points: 7 }
+            ];
+            
+            // Find highest value colour that's still on the table
+            const availableColours = colours.filter(c => balls[c.key] > 0);
+            const highestColour = availableColours.length > 0 
+                ? availableColours.reduce((max, c) => c.points > max.points ? c : max, availableColours[0])
+                : null;
+            
+            // Phase 1: While reds remain
+            if (redsRemaining > 0) {
+                const redPoints = redsRemaining * 1;
+                result.breakdown.push({
+                    type: 'reds',
+                    name: 'Reds',
+                    count: redsRemaining,
+                    points: redPoints,
+                    description: `${redsRemaining} red${redsRemaining > 1 ? 's' : ''} × 1 point`
+                });
+                result.total += redPoints;
+                
+                if (highestColour) {
+                    // After each red, can pot the highest colour
+                    const colourPoints = redsRemaining * highestColour.points;
+                    result.breakdown.push({
+                        type: 'colour_sequence',
+                        name: `${highestColour.name} (after each red)`,
+                        count: redsRemaining,
+                        points: colourPoints,
+                        description: `${redsRemaining} × ${highestColour.points} points`
+                    });
+                    result.total += colourPoints;
+                    
+                    result.explanation.push(
+                        `With ${redsRemaining} red${redsRemaining > 1 ? 's' : ''} remaining, you can pot each red (${redsRemaining} points) followed by ${highestColour.name} (${redsRemaining} × ${highestColour.points} = ${colourPoints} points).`
+                    );
+                } else {
+                    result.explanation.push(
+                        `With ${redsRemaining} red${redsRemaining > 1 ? 's' : ''} remaining, you can pot them for ${redsRemaining} points. No colours available to follow.`
+                    );
+                }
+            }
+            
+            // Phase 2: After reds are gone, pot colours in order
+            const colourOrder = ['yellow', 'green', 'brown', 'blue', 'pink', 'black'];
+            let redsGone = redsRemaining === 0;
+            
+            for (const colourKey of colourOrder) {
+                const colour = colours.find(c => c.key === colourKey);
+                const isPresent = balls[colourKey] > 0;
+                
+                if (redsGone && isPresent) {
+                    result.breakdown.push({
+                        type: 'colour',
+                        name: colour.name,
+                        count: 1,
+                        points: colour.points,
+                        description: `1 × ${colour.points} points`
+                    });
+                    result.total += colour.points;
+                }
+                
+                // Once we encounter a missing colour, we can't continue the sequence
+                if (redsGone && !isPresent) {
+                    break;
+                }
+            }
+            
+            if (redsRemaining === 0 && availableColours.length > 0) {
+                const colourNames = availableColours.map(c => c.name).join(', ');
+                result.explanation.push(
+                    `After all reds are potted, colours must be potted in order: ${colourNames}.`
+                );
+            }
+            
+            if (result.total === 0) {
+                result.explanation.push('No balls detected or all balls have been potted.');
+            }
+            
+            return result;
+        }
+
+        // ============================================================================
+        // RESULTS DISPLAY
+        // ============================================================================
+
+        function displayResults(detectedBalls, calculation) {
+            const totalPointsEl = document.getElementById('totalPoints');
+            const breakdownBody = document.getElementById('breakdownBody');
+            const explanationEl = document.getElementById('explanation');
+            
+            totalPointsEl.textContent = calculation.total;
+            
+            // Clear previous breakdown
+            breakdownBody.innerHTML = '';
+            
+            // Add reds row
+            const redsPresent = detectedBalls.reds > 0;
+            const redsRow = document.createElement('tr');
+            redsRow.innerHTML = `
+                <td><strong>Reds</strong></td>
+                <td>
+                    <span class="ball-status ${redsPresent ? 'present' : 'absent'}"></span>
+                    ${redsPresent ? `${detectedBalls.reds} remaining` : 'All potted'}
+                </td>
+                <td>1 each</td>
+                <td>${detectedBalls.reds > 0 ? detectedBalls.reds + ' points' : '0 points'}</td>
+            `;
+            breakdownBody.appendChild(redsRow);
+            
+            // Add colour rows
+            const colours = [
+                { key: 'yellow', name: 'Yellow', points: 2 },
+                { key: 'green', name: 'Green', points: 3 },
+                { key: 'brown', name: 'Brown', points: 4 },
+                { key: 'blue', name: 'Blue', points: 5 },
+                { key: 'pink', name: 'Pink', points: 6 },
+                { key: 'black', name: 'Black', points: 7 }
+            ];
+            
+            colours.forEach(colour => {
+                const isPresent = detectedBalls[colour.key] > 0;
+                const row = document.createElement('tr');
+                
+                // Find contribution from calculation breakdown
+                const contribution = calculation.breakdown
+                    .filter(b => b.name.includes(colour.name))
+                    .reduce((sum, b) => sum + b.points, 0);
+                
+                row.innerHTML = `
+                    <td><strong>${colour.name}</strong></td>
+                    <td>
+                        <span class="ball-status ${isPresent ? 'present' : 'absent'}"></span>
+                        ${isPresent ? 'On table' : 'Potted'}
+                    </td>
+                    <td>${colour.points} points</td>
+                    <td>${contribution > 0 ? contribution + ' points' : '0 points'}</td>
+                `;
+                breakdownBody.appendChild(row);
+            });
+            
+            // Add explanation
+            explanationEl.innerHTML = '<strong>Calculation:</strong><br>' + 
+                calculation.explanation.join('<br>');
+            
+            resultsSection.classList.add('active');
+        }
+    </script>
+</body>
+</html>
